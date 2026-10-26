@@ -1,3 +1,5 @@
+import { ChatAnthropic } from '@langchain/anthropic'
+
 export const config: WebdriverIO.Config = {
     //
     // ====================
@@ -52,7 +54,9 @@ export const config: WebdriverIO.Config = {
     // https://saucelabs.com/platform/platform-configurator
     //
     capabilities: [{
-        browserName: 'chrome'
+        browserName: 'chrome',
+        // WebDriver BiDi lets the AI service check step effects and read API responses
+        webSocketUrl: true
     }],
 
     //
@@ -102,7 +106,18 @@ export const config: WebdriverIO.Config = {
     // Services take over a specific job you don't want to take care of. They enhance
     // your test setup with almost no effort. Unlike plugins, they don't add new
     // commands. Instead, they hook themselves up into the test process.
-    // services: [],
+    // The AI service adds browser.act() and browser.extract(). Needs ANTHROPIC_API_KEY.
+    // A model instance instead of 'anthropic:claude-sonnet-5-5': the string form always
+    // sends temperature 0, which Sonnet 5.5 rejects. Parallel tool calls are disabled
+    // because the service runs them concurrently and records the steps out of order.
+    // Without a key no model is created: cached act() steps and plain tests still run.
+    services: [['ai', {
+        model: process.env.ANTHROPIC_API_KEY ? new ChatAnthropic({
+            model: 'claude-sonnet-5-5',
+            invocationKwargs: { tool_choice: { type: 'auto', disable_parallel_tool_use: true } }
+        }) : undefined,
+        effects: { mode: 'strict', ignore: ['optimizely.com'] }
+    }]],
     //
     // The DevTools service shows a live dashboard of your run and can record a
     // replayable trace of every test. Install @wdio/devtools-service, then add
